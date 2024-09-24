@@ -15,7 +15,20 @@ $DnsServers = @(
     "10.204.0.5"
 )
 
-Write-Host $(nslookup $AppName 2>$null | sls address | select -last 1)
+foreach ($Server in $DnsServers) {
+    $Props = @{
+        DateTime = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        Server = $Server
+        AppName = $AppName
+        LookupResult = ""
+        # ServiceState = ""
+        # TimeTaken = ""
+    }
+    $DnsResult = (nslookup $AppName $server 2>$null | sls address | select -last 1).ToString().Split(":")[1].Trim()
+    $Props.LookupResult = $DnsResult
+    $Obj = New-Object PSObject -Property $Props
+    Write-Output $Obj
+}
 
 # Write an information log with the current time.
 Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
