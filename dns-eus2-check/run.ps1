@@ -1,21 +1,8 @@
 # Input bindings are passed in via param block.
 param($Timer)
 
-# Get the current universal time in the default string format
-$currentUTCtime = (Get-Date).ToUniversalTime()
-
-# The 'IsPastDue' porperty is 'true' when the current function invocation is later than scheduled.
-if ($Timer.IsPastDue) {
-    Write-Host "PowerShell timer is running late!"
-}
-
-# Write an information log with the current time.
-Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
-
 $AppName = "sapp-p-cus-sql-2-sql.database.windows.net."
 $DnsServers = @(
-    "10.202.0.4",
-    "10.202.0.5",
     "10.204.0.4",
     "10.204.0.5"
 )
@@ -31,11 +18,11 @@ $sb = {
         TimeTaken = ""
     }
     
-    $TimeTaken = Measure-Command {$DnsResult = Resolve-DnsName -Name $AppName -Server $Server}
+    $TimeTaken = Measure-Command {$DnsResult = (nslookup $AppName $server 2>$null | sls address | select -last 1).ToString().Split(":")[1].Trim()}
     $Props.TimeTaken = $TimeTaken.TotalMilliseconds
 
     if ($DnsResult.Count -gt 0) {
-        $Props.LookupResult = $DnsResult.IP4Address
+        $Props.LookupResult = $DnsResult
         $Props.ServiceState = "UP"
     } else {
         $Props.LookupResult = "FAILED"
@@ -47,7 +34,7 @@ $sb = {
         }
     }
     $Obj = New-Object PSObject -Property $Props
-    
+
     $Obj
 }
 
