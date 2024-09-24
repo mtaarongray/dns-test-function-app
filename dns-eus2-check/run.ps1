@@ -20,17 +20,22 @@ $DnsServers = @(
     "10.204.0.5"
 )
 
-$ResultOutput = @()
-foreach ($Server in $DnsServers) {
+$sb = {
+    param($AppName, $Server)
     $Props = @{
+        DateTime = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         Server = $Server
         AppName = $AppName
         LookupResult = ""
         ServiceState = ""
+        TimeTaken = ""
     }
-    $DnsResult = Resolve-DnsName -Name $AppName -Server $Server
-    if ($DnsResult.QueryResults.Count -gt 0) {
-        $Props.LookupResult = $DnsResult.QueryResults.IPAddress
+    
+    $TimeTaken = Measure-Command {$DnsResult = Resolve-DnsName -Name $AppName -Server $Server}
+    $Props.TimeTaken = $TimeTaken.TotalMilliseconds
+
+    if ($DnsResult.Count -gt 0) {
+        $Props.LookupResult = $DnsResult.IP4Address
         $Props.ServiceState = "UP"
     } else {
         $Props.LookupResult = "FAILED"
@@ -41,7 +46,18 @@ foreach ($Server in $DnsServers) {
             $Props.ServiceState = "UNREACHABLE"
         }
     }
-    $ResultOutput += New-Object PSObject -Property $Props
+    $Obj = New-Object PSObject -Property $Props
+    
+    $Obj
+}
+
+$ResultOutput = @()
+foreach ($Server in $DnsServers) {
+    Start-Job -ScriptBlock $sb -ArgumentList $AppName, $Server | Out-Null
+    do {
+        $Result = Get-Job | Receive-Job -Wait -AutoRemoveJob
+        $ResultOutput += $Result
+    } while ($Result -eq $null)
 }
 
 $ResultOutput | Format-Table -AutoSize
